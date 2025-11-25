@@ -1,0 +1,18 @@
+{
+  "name": "flight-node-server",
+  "version": "1.0.0",
+  "description": "フライト情報をPostgreSQLから取得してHTMLを返すNode.jsサーバー",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "express": "*",
+    "pg": "*",
+    "cors": "*"
+  },
+  "devDependencies": {
+    "nodemon": "*"
+  }
+}

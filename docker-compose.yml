@@ -1,0 +1,53 @@
+services:
+  postgres-db:
+    image: postgres:16
+    restart: always
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${FLIGHT_DB}
+    volumes:
+      - postgres-flight-data:/var/lib/postgresql/data
+    ports:
+      - "55433:5432"
+
+  flight-api:
+    build:
+      context: ./flight-api
+      dockerfile: Dockerfile
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_HOST=postgres-db
+      - POSTGRES_PORT=5432
+      - FLIGHT_DB=${FLIGHT_DB}
+    depends_on:
+      - postgres-db
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./flight-api:/app
+    restart: always
+
+  flight-node-server:
+    build:
+      context: ./flight-node-server
+      dockerfile: Dockerfile
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_HOST=postgres-db
+      - POSTGRES_PORT=5432
+      - FLIGHT_DB=${FLIGHT_DB}
+      - PORT=3005
+    depends_on:
+      - postgres-db
+    ports:
+      - "3005:3005"
+    volumes:
+      - ./flight-node-server:/app
+      - /app/node_modules
+    restart: always
+
+volumes:
+  postgres-flight-data:
