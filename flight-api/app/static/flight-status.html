@@ -227,15 +227,21 @@
             const submitBtn = document.getElementById('submitBtn');
             
             // 便名から航空会社コードとフライト番号を分離
-            const match = flightNumber.match(/^([A-Z0-9]{2,3})(\d{1,4})$/i);
             let carrier = carrierCode;
             let number = flightNumber;
             
+            // より柔軟な正規表現：航空会社コード（2-3文字の英数字）+ フライト番号（1-4桁）
+            const match = flightNumber.match(/^([A-Z]{2}[A-Z0-9]?)(\d{1,4})$/i);
+            
             if (match) {
+                // 便名全体が入力された場合（例: SQ11, NH123）
                 carrier = carrier || match[1].toUpperCase();
                 number = match[2];
             } else if (/^\d+$/.test(flightNumber)) {
-                // 数字のみの場合
+                // 数字のみの場合（例: 11, 123）
+                number = flightNumber;
+            } else {
+                // その他の形式の場合、そのまま使用
                 number = flightNumber;
             }
             
