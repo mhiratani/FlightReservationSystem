@@ -11,9 +11,10 @@ class AmadeusClient:
     """Amadeus API との通信を管理するクライアント"""
     
     def __init__(self):
-        self.api_key = os.getenv("AMADEUS_TEST_API_KEY")
-        self.api_secret = os.getenv("AMADEUS_TEST_API_SECRET")
-        self.base_url = "https://test.api.amadeus.com"
+        # 本番環境のAPIキーを使用
+        self.api_key = os.getenv("AMADEUS_API_KEY")
+        self.api_secret = os.getenv("AMADEUS_API_SECRET")
+        self.base_url = "https://api.amadeus.com"
         self.token = None
         self.token_expires_at = None
     
