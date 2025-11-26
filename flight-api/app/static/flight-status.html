@@ -178,8 +178,6 @@
 </head>
 <body>
     <div class="container">
-        <a href="/admin" class="back-link">← 管理画面に戻る</a>
-        
         <h1>✈️ 個別フライトステータス確認</h1>
         <p class="description">
             便名と出発日を入力して、リアルタイムのフライト情報を確認できます。<br>
@@ -230,11 +228,12 @@
             let carrier = carrierCode;
             let number = flightNumber;
             
-            // より柔軟な正規表現：航空会社コード（2-3文字の英数字）+ フライト番号（1-4桁）
-            const match = flightNumber.match(/^([A-Z]{2}[A-Z0-9]?)(\d{1,4})$/i);
+            // 末尾の数字を便名、先頭の英字を航空会社コードとして抽出
+            // 任意の長さの英字 + 任意の桁数の数字に対応
+            const match = flightNumber.match(/^([A-Z]+)(\d+)$/i);
             
             if (match) {
-                // 便名全体が入力された場合（例: SQ11, NH123）
+                // 便名全体が入力された場合（例: NH123, SQ11, JAL0001, ABC1234）
                 carrier = carrier || match[1].toUpperCase();
                 number = match[2];
             } else if (/^\d+$/.test(flightNumber)) {
