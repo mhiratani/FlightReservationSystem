@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>個別フライトステータス確認</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .description {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        form {
+            background-color: #f9f9f9;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+        input[type="text"],
+        input[type="date"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+        .hint {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        button {
+            background-color: #2196F3;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #1976D2;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        #result {
+            margin-top: 20px;
+        }
+        .result-card {
+            background-color: #f9f9f9;
+            border-left: 4px solid #2196F3;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        .result-card h2 {
+            color: #2196F3;
+            margin-top: 0;
+            margin-bottom: 20px;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .info-item {
+            padding: 12px;
+            background-color: white;
+            border-radius: 4px;
+            border: 1px solid #e0e0e0;
+        }
+        .info-item strong {
+            display: block;
+            color: #666;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+        .info-item span {
+            font-size: 16px;
+            color: #333;
+        }
+        .error {
+            background-color: #ffebee;
+            border-left: 4px solid #f44336;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 20px;
+        }
+        .loading {
+            color: #2196F3;
+            padding: 15px;
+            text-align: center;
+        }
+        .raw-json {
+            margin-top: 20px;
+        }
+        .json-toggle {
+            background-color: #888;
+            padding: 8px 16px;
+            font-size: 14px;
+        }
+        .json-toggle:hover {
+            background-color: #666;
+        }
+        .json-content {
+            display: none;
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin-top: 10px;
+        }
+        .json-content.show {
+            display: block;
+        }
+        .json-content pre {
+            margin: 0;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+        .back-link {
+            display: inline-block;
+            color: #2196F3;
+            text-decoration: none;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        .segment-card {
+            background-color: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        .segment-header {
+            font-weight: bold;
+            color: #2196F3;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/admin" class="back-link">← 管理画面に戻る</a>
+        
+        <h1>✈️ 個別フライトステータス確認</h1>
+        <p class="description">
+            便名と出発日を入力して、リアルタイムのフライト情報を確認できます。<br>
+            Amadeus On-Demand Flight Status APIを使用しています。
+        </p>
+        
+        <form id="statusForm">
+            <div class="form-group">
+                <label for="flightNumber">便名 *</label>
+                <input type="text" id="flightNumber" placeholder="例: NH123 または 123" required>
+                <div class="hint">便名全体（例: NH123）または番号のみ（例: 123）を入力してください</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="carrierCode">航空会社コード（便名から自動抽出されない場合のみ）</label>
+                <input type="text" id="carrierCode" placeholder="例: NH" maxlength="3">
+                <div class="hint">2-3文字の航空会社コード（IATA）</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="departureDate">出発日 *</label>
+                <input type="date" id="departureDate" required>
+                <div class="hint">フライトの出発予定日</div>
+            </div>
+            
+            <button type="submit" id="submitBtn">📡 ステータス取得</button>
+        </form>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin + '/api';
+        
+        // 今日の日付をデフォルトで設定
+        document.getElementById('departureDate').valueAsDate = new Date();
+        
+        document.getElementById('statusForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const flightNumber = document.getElementById('flightNumber').value.trim();
+            const carrierCode = document.getElementById('carrierCode').value.trim();
+            const departureDate = document.getElementById('departureDate').value;
+            const resultDiv = document.getElementById('result');
+            const submitBtn = document.getElementById('submitBtn');
+            
+            // 便名から航空会社コードとフライト番号を分離
+            const match = flightNumber.match(/^([A-Z0-9]{2,3})(\d{1,4})$/i);
+            let carrier = carrierCode;
+            let number = flightNumber;
+            
+            if (match) {
+                carrier = carrier || match[1].toUpperCase();
+                number = match[2];
+            } else if (/^\d+$/.test(flightNumber)) {
+                // 数字のみの場合
+                number = flightNumber;
+            }
+            
+            if (!carrier) {
+                resultDiv.innerHTML = '<div class="error">航空会社コードを入力するか、正しい便名形式（例: NH123）で入力してください</div>';
+                return;
+            }
+            
+            // ローディング表示
+            resultDiv.innerHTML = '<div class="loading">🔄 フライトステータスを取得中...</div>';
+            submitBtn.disabled = true;
+            
+            try {
+                const response = await fetch(
+                    `${API_BASE}/flights/status/live?` +
+                    `carrierCode=${encodeURIComponent(carrier)}&` +
+                    `flightNumber=${encodeURIComponent(number)}&` +
+                    `scheduledDepartureDate=${encodeURIComponent(departureDate)}`
+                );
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    displayResult(data, carrier + number, departureDate);
+                } else {
+                    const error = await response.json();
+                    resultDiv.innerHTML = `<div class="error">
+                        <strong>エラー:</strong> ${error.detail || 'フライト情報の取得に失敗しました'}
+                    </div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">
+                    <strong>通信エラー:</strong> ${error.message}
+                </div>`;
+            } finally {
+                submitBtn.disabled = false;
+            }
+        });
+        
+        function displayResult(data, flightNumber, departureDate) {
+            const resultDiv = document.getElementById('result');
+            
+            if (!data.data || data.data.length === 0) {
+                resultDiv.innerHTML = '<div class="error">指定されたフライトが見つかりませんでした</div>';
+                return;
+            }
+            
+            const flight = data.data[0];
+            const flightDesignator = flight.flightDesignator || {};
+            const flightPoints = flight.flightPoints || [];
+            const segments = flight.segments || [];
+            const legs = flight.legs || [];
+            
+            let html = '<div class="result-card">';
+            html += '<h2>✅ フライトステータス</h2>';
+            
+            // 基本情報
+            html += '<div class="info-grid">';
+            html += `<div class="info-item">
+                <strong>便名</strong>
+                <span>${escapeHtml(flightDesignator.carrierCode || '')}${escapeHtml(flightDesignator.flightNumber || '')}</span>
+            </div>`;
+            html += `<div class="info-item">
+                <strong>出発予定日</strong>
+                <span>${escapeHtml(flight.scheduledDepartureDate || departureDate)}</span>
+            </div>`;
+            if (flightDesignator.operationalSuffix) {
+                html += `<div class="info-item">
+                    <strong>運航サフィックス</strong>
+                    <span>${escapeHtml(flightDesignator.operationalSuffix)}</span>
+                </div>`;
+            }
+            html += '</div>';
+            
+            // フライトポイント（出発・到着情報）
+            if (flightPoints.length > 0) {
+                html += '<h3 style="margin-top: 20px; margin-bottom: 15px; color: #333;">📍 フライトポイント</h3>';
+                
+                flightPoints.forEach(point => {
+                    html += '<div class="segment-card">';
+                    html += `<div class="segment-header">${escapeHtml(point.iataCode || 'N/A')}</div>`;
+                    
+                    if (point.departure) {
+                        html += '<div style="margin-bottom: 10px;"><strong>出発:</strong></div>';
+                        html += '<div class="info-grid">';
+                        
+                        if (point.departure.terminal) {
+                            html += `<div class="info-item">
+                                <strong>ターミナル</strong>
+                                <span>${escapeHtml(point.departure.terminal.code || 'N/A')}</span>
+                            </div>`;
+                        }
+                        
+                        if (point.departure.gate) {
+                            html += `<div class="info-item">
+                                <strong>ゲート</strong>
+                                <span>${escapeHtml(point.departure.gate.mainGate || 'N/A')}</span>
+                            </div>`;
+                        }
+                        
+                        if (point.departure.timings) {
+                            point.departure.timings.forEach(timing => {
+                                html += `<div class="info-item">
+                                    <strong>${escapeHtml(timing.qualifier || 'Time')}</strong>
+                                    <span>${formatDateTime(timing.value)}</span>
+                                </div>`;
+                            });
+                        }
+                        
+                        html += '</div>';
+                    }
+                    
+                    if (point.arrival) {
+                        html += '<div style="margin-top: 10px; margin-bottom: 10px;"><strong>到着:</strong></div>';
+                        html += '<div class="info-grid">';
+                        
+                        if (point.arrival.terminal) {
+                            html += `<div class="info-item">
+                                <strong>ターミナル</strong>
+                                <span>${escapeHtml(point.arrival.terminal.code || 'N/A')}</span>
+                            </div>`;
+                        }
+                        
+                        if (point.arrival.gate) {
+                            html += `<div class="info-item">
+                                <strong>ゲート</strong>
+                                <span>${escapeHtml(point.arrival.gate.mainGate || 'N/A')}</span>
+                            </div>`;
+                        }
+                        
+                        if (point.arrival.timings) {
+                            point.arrival.timings.forEach(timing => {
+                                html += `<div class="info-item">
+                                    <strong>${escapeHtml(timing.qualifier || 'Time')}</strong>
+                                    <span>${formatDateTime(timing.value)}</span>
+                                </div>`;
+                            });
+                        }
+                        
+                        html += '</div>';
+                    }
+                    
+                    html += '</div>';
+                });
+            }
+            
+            // セグメント情報
+            if (segments.length > 0) {
+                html += '<h3 style="margin-top: 20px; margin-bottom: 15px; color: #333;">🛫 セグメント</h3>';
+                segments.forEach((segment, index) => {
+                    html += '<div class="segment-card">';
+                    html += `<div class="segment-header">セグメント ${index + 1}</div>`;
+                    html += '<div class="info-grid">';
+                    html += `<div class="info-item">
+                        <strong>出発空港</strong>
+                        <span>${escapeHtml(segment.boardPointIataCode || 'N/A')}</span>
+                    </div>`;
+                    html += `<div class="info-item">
+                        <strong>到着空港</strong>
+                        <span>${escapeHtml(segment.offPointIataCode || 'N/A')}</span>
+                    </div>`;
+                    if (segment.scheduledSegmentDuration) {
+                        html += `<div class="info-item">
+                            <strong>所要時間</strong>
+                            <span>${escapeHtml(segment.scheduledSegmentDuration)}</span>
+                        </div>`;
+                    }
+                    html += '</div>';
+                    html += '</div>';
+                });
+            }
+            
+            // レグ情報
+            if (legs.length > 0) {
+                html += '<h3 style="margin-top: 20px; margin-bottom: 15px; color: #333;">✈️ レグ（運航区間）</h3>';
+                legs.forEach((leg, index) => {
+                    html += '<div class="segment-card">';
+                    html += `<div class="segment-header">レグ ${index + 1}</div>`;
+                    html += '<div class="info-grid">';
+                    html += `<div class="info-item">
+                        <strong>出発空港</strong>
+                        <span>${escapeHtml(leg.boardPointIataCode || 'N/A')}</span>
+                    </div>`;
+                    html += `<div class="info-item">
+                        <strong>到着空港</strong>
+                        <span>${escapeHtml(leg.offPointIataCode || 'N/A')}</span>
+                    </div>`;
+                    if (leg.aircraftEquipment && leg.aircraftEquipment.aircraftType) {
+                        html += `<div class="info-item">
+                            <strong>機材</strong>
+                            <span>${escapeHtml(leg.aircraftEquipment.aircraftType)}</span>
+                        </div>`;
+                    }
+                    if (leg.scheduledLegDuration) {
+                        html += `<div class="info-item">
+                            <strong>所要時間</strong>
+                            <span>${escapeHtml(leg.scheduledLegDuration)}</span>
+                        </div>`;
+                    }
+                    html += '</div>';
+                    html += '</div>';
+                });
+            }
+            
+            html += '</div>';
+            
+            // Raw JSONを表示するトグル
+            html += '<div class="raw-json">';
+            html += '<button class="json-toggle" onclick="toggleJson()">📄 Raw JSON データを表示/非表示</button>';
+            html += '<div class="json-content" id="jsonContent">';
+            html += '<pre>' + escapeHtml(JSON.stringify(data, null, 2)) + '</pre>';
+            html += '</div>';
+            html += '</div>';
+            
+            resultDiv.innerHTML = html;
+        }
+        
+        function toggleJson() {
+            const jsonContent = document.getElementById('jsonContent');
+            jsonContent.classList.toggle('show');
+        }
+        
+        function escapeHtml(text) {
+            if (text === null || text === undefined) return '';
+            const div = document.createElement('div');
+            div.textContent = String(text);
+            return div.innerHTML;
+        }
+        
+        function formatDateTime(datetime) {
+            if (!datetime) return 'N/A';
+            try {
+                const date = new Date(datetime);
+                return date.toLocaleString('ja-JP', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    timeZoneName: 'short'
+                });
+            } catch (e) {
+                return datetime;
+            }
+        }
+    </script>
+</body>
+</html>

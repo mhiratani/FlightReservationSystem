@@ -673,3 +673,142 @@ async def admin_page():
             status_code=status.HTTP_404_NOT_FOUND,
             detail="管理画面が見つかりません"
         )
+
+# Amadeus API統合
+from .amadeus_client import AmadeusClient
+from .timezone_manager import TimezoneManager
+import httpx
+
+# グローバルインスタンス
+amadeus_client = AmadeusClient()
+timezone_manager = TimezoneManager()
+
+@app.get("/flight-status")
+async def flight_status_page():
+    """個別フライトステータス確認画面"""
+    status_html_path = os.path.join(
+        os.path.dirname(__file__), 
+        "static", 
+        "flight-status.html"
+    )
+    if os.path.exists(status_html_path):
+        return FileResponse(status_html_path)
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND, 
+        detail="フライトステータス確認画面が見つかりません"
+    )
+
+@app.get("/api/flights/status/live")
+async def get_live_flight_status(
+    carrierCode: str,
+    flightNumber: str,
+    scheduledDepartureDate: str,
+    operationalSuffix: Optional[str] = None
+):
+    """
+    リアルタイムフライトステータス取得
+    
+    Amadeus On-Demand Flight Status APIを使用して
+    最新のフライト情報を取得します。
+    
+    Args:
+        carrierCode: 航空会社コード（2-3文字、例: NH）
+        flightNumber: フライト番号（1-4桁、例: 123）
+        scheduledDepartureDate: 出発予定日（YYYY-MM-DD形式）
+        operationalSuffix: 運航サフィックス（オプション）
+    """
+    try:
+        result = await amadeus_client.get_flight_status(
+            carrier_code=carrierCode,
+            flight_number=flightNumber,
+            scheduled_departure_date=scheduledDepartureDate,
+            operational_suffix=operationalSuffix
+        )
+        return result
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            raise HTTPException(
+                status_code=404,
+                detail="指定されたフライトが見つかりませんでした"
+            )
+        raise HTTPException(
+            status_code=e.response.status_code,
+            detail=f"API呼び出しエラー: {e.response.text}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"ステータス取得エラー: {str(e)}"
+        )
+
+@app.post("/api/flights/fetch-from-order")
+async def fetch_from_order(request: dict):
+    """
+    予約番号からフライト情報を取得
+    
+    Flight Order Management APIを使用して予約情報を取得し、
+    フライト情報を抽出します。
+    
+    Args:
+        request: {"flight_order_id": "予約番号"}
+    """
+    flight_order_id = request.get("flight_order_id")
+    if not flight_order_id:
+        raise HTTPException(
+            status_code=400,
+            detail="flight_order_idが必要です"
+        )
+    
+    try:
+        # Flight Order Management APIで予約情報を取得
+        order_data = await amadeus_client.get_flight_order(flight_order_id)
+        
+        # フライト情報を抽出
+        flights = []
+        if "data" in order_data and "flightOffers" in order_data["data"]:
+            for offer in order_data["data"]["flightOffers"]:
+                # 各itineraryからセグメント情報を抽出
+                for itinerary in offer.get("itineraries", []):
+                    for segment in itinerary.get("segments", []):
+                        flight_info = {
+                            "flight_date": segment.get("departure", {}).get("at", "")[:10],
+                            "flight_number": segment.get("carrierCode", "") + segment.get("number", ""),
+                            "departure_airport": segment.get("departure", {}).get("iataCode"),
+                            "arrival_airport": segment.get("arrival", {}).get("iataCode"),
+                            "departure_time": segment.get("departure", {}).get("at", "")[11:16] if segment.get("departure", {}).get("at") else None,
+                            "arrival_time": segment.get("arrival", {}).get("at", "")[11:16] if segment.get("arrival", {}).get("at") else None,
+                            "reservation_number": order_data["data"].get("associatedRecords", [{}])[0].get("reference", flight_order_id),
+                            "seat_number": None,  # Seat情報は別途取得が必要
+                            "status": "Reserved",
+                            "aircraft_type": segment.get("aircraft", {}).get("code"),
+                            "terminal": segment.get("departure", {}).get("terminal") or segment.get("arrival", {}).get("terminal"),
+                            "payment_amount": None,
+                            "currency": offer.get("price", {}).get("currency"),
+                        }
+                        flights.append(flight_info)
+        
+        # 旅行者情報も抽出
+        travelers = order_data.get("data", {}).get("travelers", [])
+        
+        return {
+            "success": True,
+            "message": f"{len(flights)}件のフライト情報を取得しました",
+            "flights": flights,
+            "travelers": travelers
+        }
+        
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            raise HTTPException(
+                status_code=404,
+                detail="指定された予約番号が見つかりませんでした"
+            )
+        raise HTTPException(
+            status_code=e.response.status_code,
+            detail=f"API呼び出しエラー: {e.response.text}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"予約情報取得エラー: {str(e)}"
+        )

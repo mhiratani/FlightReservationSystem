@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Date, Time, Text, TIMESTAMP, Numeric
+from sqlalchemy import Column, Integer, String, Date, Time, Text, TIMESTAMP, Numeric, JSON
 from sqlalchemy.sql import func
 from app.database import Base
 
@@ -19,5 +19,17 @@ class Flight(Base):
     notes = Column(Text, nullable=True)
     payment_amount = Column(Numeric(10, 2), nullable=True)
     currency = Column(String(3), nullable=True, default="JPY")
+    
+    # Amadeus API連携用フィールド
+    gate_number = Column(String(10), nullable=True)
+    terminal = Column(String(10), nullable=True)
+    actual_departure_time = Column(Time, nullable=True)
+    actual_arrival_time = Column(Time, nullable=True)
+    delay_duration = Column(String(20), nullable=True)
+    aircraft_type = Column(String(10), nullable=True)
+    amadeus_flight_order_id = Column(String(100), nullable=True)
+    last_status_check = Column(TIMESTAMP, nullable=True)
+    traveler_info = Column(JSON, nullable=True)
+    
     created_at = Column(TIMESTAMP, server_default=func.now(), nullable=False)
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now(), nullable=False)

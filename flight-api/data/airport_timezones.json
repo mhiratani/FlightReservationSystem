@@ -1,0 +1,66 @@
+{
+  "version": "1.0.0",
+  "last_updated": "2025-11-26T00:00:00Z",
+  "airports": {
+    "HND": {
+      "iata_code": "HND",
+      "city_name": "Tokyo",
+      "city_code": "TYO",
+      "country_code": "JP",
+      "timezone_offset": "+09:00",
+      "timezone_name": "Asia/Tokyo",
+      "source": "manual",
+      "updated_at": "2025-11-26T00:00:00Z"
+    },
+    "NRT": {
+      "iata_code": "NRT",
+      "city_name": "Tokyo",
+      "city_code": "TYO",
+      "country_code": "JP",
+      "timezone_offset": "+09:00",
+      "timezone_name": "Asia/Tokyo",
+      "source": "manual",
+      "updated_at": "2025-11-26T00:00:00Z"
+    },
+    "KIX": {
+      "iata_code": "KIX",
+      "city_name": "Osaka",
+      "city_code": "OSA",
+      "country_code": "JP",
+      "timezone_offset": "+09:00",
+      "timezone_name": "Asia/Tokyo",
+      "source": "manual",
+      "updated_at": "2025-11-26T00:00:00Z"
+    },
+    "ITM": {
+      "iata_code": "ITM",
+      "city_name": "Osaka",
+      "city_code": "OSA",
+      "country_code": "JP",
+      "timezone_offset": "+09:00",
+      "timezone_name": "Asia/Tokyo",
+      "source": "manual",
+      "updated_at": "2025-11-26T00:00:00Z"
+    },
+    "FUK": {
+      "iata_code": "FUK",
+      "city_name": "Fukuoka",
+      "city_code": "FUK",
+      "country_code": "JP",
+      "timezone_offset": "+09:00",
+      "timezone_name": "Asia/Tokyo",
+      "source": "manual",
+      "updated_at": "2025-11-26T00:00:00Z"
+    },
+    "CTS": {
+      "iata_code": "CTS",
+      "city_name": "Sapporo",
+      "city_code": "SPK",
+      "country_code": "JP",
+      "timezone_offset": "+09:00",
+      "timezone_name": "Asia/Tokyo",
+      "source": "manual",
+      "updated_at": "2025-11-26T00:00:00Z"
+    }
+  }
+}
