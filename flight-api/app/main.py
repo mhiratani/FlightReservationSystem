@@ -398,20 +398,32 @@ async def upload_eticket(
         "file_path": file_path
     }
 
-@app.post("/api/flights/import-from-pdf", response_model=PDFImportResponse)
-async def import_from_pdf(file: UploadFile = File(...)):
-    """PDFからフライト情報を抽出（Claude API使用）"""
+@app.post("/api/flights/import-from-file", response_model=PDFImportResponse)
+async def import_from_file(file: UploadFile = File(...)):
+    """PDFまたは画像からフライト情報を抽出（Claude API使用）"""
     # ファイル形式チェック
-    if not file.filename.lower().endswith('.pdf'):
+    file_extension = file.filename.lower().split('.')[-1]
+    supported_formats = {
+        'pdf': ('document', 'application/pdf'),
+        'png': ('image', 'image/png'),
+        'jpg': ('image', 'image/jpeg'),
+        'jpeg': ('image', 'image/jpeg'),
+        'webp': ('image', 'image/webp'),
+        'gif': ('image', 'image/gif')
+    }
+    
+    if file_extension not in supported_formats:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="PDFファイルのみアップロード可能です"
+            detail=f"サポートされていないファイル形式です。対応形式: {', '.join(supported_formats.keys())}"
         )
     
+    content_type, media_type = supported_formats[file_extension]
+    
     try:
-        # PDFファイルを読み込んでBase64エンコード
-        pdf_content = await file.read()
-        pdf_base64 = base64.standard_b64encode(pdf_content).decode("utf-8")
+        # ファイルを読み込んでBase64エンコード
+        file_content = await file.read()
+        file_base64 = base64.standard_b64encode(file_content).decode("utf-8")
         
         # APIキーを環境変数から取得
         api_key = os.getenv("ANTHROPIC_API_KEY")
@@ -424,8 +436,28 @@ async def import_from_pdf(file: UploadFile = File(...)):
         # Claude APIクライアントを初期化
         client = anthropic.Anthropic(api_key=api_key)
         
+        # ファイルタイプに応じてcontentブロックを構築
+        if content_type == 'document':
+            file_content_block = {
+                "type": "document",
+                "source": {
+                    "type": "base64",
+                    "media_type": media_type,
+                    "data": file_base64
+                }
+            }
+        else:  # image
+            file_content_block = {
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": media_type,
+                    "data": file_base64
+                }
+            }
+        
         # プロンプトを作成（日本語）
-        prompt = """このEチケットPDFから、以下の情報を抽出してください。
+        prompt = """このEチケット（PDFまたは画像）から、以下の情報を抽出してください。
 1つのEチケットに複数の便が含まれている場合は、すべての便の情報を抽出してください。
 
 抽出する情報：
@@ -469,14 +501,7 @@ async def import_from_pdf(file: UploadFile = File(...)):
                 {
                     "role": "user",
                     "content": [
-                        {
-                            "type": "document",
-                            "source": {
-                                "type": "base64",
-                                "media_type": "application/pdf",
-                                "data": pdf_base64
-                            }
-                        },
+                        file_content_block,
                         {
                             "type": "text",
                             "text": prompt
@@ -528,7 +553,7 @@ async def import_from_pdf(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"PDFの処理中にエラーが発生しました: {str(e)}"
+            detail=f"ファイルの処理中にエラーが発生しました: {str(e)}"
         )
 
 @app.get("/admin")

@@ -122,13 +122,13 @@
     <div class="container">
         <h1>✈️ フライト予約管理システム</h1>
         
-        <h2>📄 PDFからインポート</h2>
+        <h2>📄 ファイルからインポート</h2>
         <div style="background-color: #f9f9f9; padding: 20px; border-radius: 5px; margin-bottom: 20px;">
             <label for="pdfFile" style="display: block; margin-bottom: 10px;">
-                <strong>EチケットPDFファイルを選択：</strong>
+                <strong>Eチケットファイルを選択（PDF/画像）：</strong>
             </label>
-            <input type="file" id="pdfFile" accept=".pdf" style="margin-bottom: 10px;">
-            <button type="button" onclick="importFromPDF()">📥 PDFから情報を抽出</button>
+            <input type="file" id="pdfFile" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif" style="margin-bottom: 10px;">
+            <button type="button" onclick="importFromFile()">📥 ファイルから情報を抽出</button>
             <div id="pdfImportStatus" style="margin-top: 10px;"></div>
             
             <!-- プレビューテーブル -->
@@ -605,26 +605,26 @@
             }
         }
         
-        // PDFインポート関連の変数
+        // ファイルインポート関連の変数
         let extractedFlights = [];
         
-        // PDFからインポート
-        async function importFromPDF() {
+        // ファイルからインポート
+        async function importFromFile() {
             const fileInput = document.getElementById('pdfFile');
             const statusDiv = document.getElementById('pdfImportStatus');
             
             if (!fileInput.files[0]) {
-                alert('PDFファイルを選択してください');
+                alert('ファイルを選択してください');
                 return;
             }
             
-            statusDiv.innerHTML = '<p style="color: blue;">📤 PDFを処理中...</p>';
+            statusDiv.innerHTML = '<p style="color: blue;">📤 ファイルを処理中...</p>';
             
             const formData = new FormData();
             formData.append('file', fileInput.files[0]);
             
             try {
-                const response = await fetch(`${API_BASE}/flights/import-from-pdf`, {
+                const response = await fetch(`${API_BASE}/flights/import-from-file`, {
                     method: 'POST',
                     body: formData
                 });
@@ -640,8 +640,8 @@
                     statusDiv.innerHTML = `<p style="color: red;">❌ エラー: ${error.detail}</p>`;
                 }
             } catch (error) {
-                console.error('PDFインポートエラー:', error);
-                statusDiv.innerHTML = `<p style="color: red;">❌ PDFの処理に失敗しました: ${error.message}</p>`;
+                console.error('ファイルインポートエラー:', error);
+                statusDiv.innerHTML = `<p style="color: red;">❌ ファイルの処理に失敗しました: ${error.message}</p>`;
             }
         }
         
