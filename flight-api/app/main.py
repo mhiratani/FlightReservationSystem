@@ -798,14 +798,24 @@ async def fetch_from_order(request: dict):
         }
         
     except httpx.HTTPStatusError as e:
+        error_detail = f"Amadeus API Error (Status {e.response.status_code})"
+        try:
+            error_json = e.response.json()
+            if "errors" in error_json:
+                errors = error_json["errors"]
+                error_messages = [f"Code {err.get('code', 'N/A')}: {err.get('title', 'N/A')} - {err.get('detail', 'N/A')}" for err in errors]
+                error_detail = f"{error_detail}\n" + "\n".join(error_messages)
+        except:
+            error_detail = f"{error_detail}: {e.response.text}"
+        
         if e.response.status_code == 404:
             raise HTTPException(
                 status_code=404,
-                detail="指定された予約番号が見つかりませんでした"
+                detail=f"指定された予約番号が見つかりませんでした。\n\n⚠️ エラー詳細:\n{error_detail}"
             )
         raise HTTPException(
             status_code=e.response.status_code,
-            detail=f"API呼び出しエラー: {e.response.text}"
+            detail=error_detail
         )
     except Exception as e:
         raise HTTPException(
