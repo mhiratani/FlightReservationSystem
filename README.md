@@ -2,6 +2,30 @@
 
 フライトの予約情報と搭乗記録を管理するためのシステムです。
 
+## 🆕 新機能: PDFからの自動インポート
+
+**Claude APIを使用したEチケットPDF解析機能**を実装しました！
+
+### 主な機能
+- EチケットPDFをアップロードするだけで、フライト情報を自動抽出
+- **1つのPDFに複数の便が含まれている場合も対応**
+- 抽出されたデータをプレビューで確認・編集可能
+- 個別登録または一括登録が選択可能
+
+### 使い方
+1. 管理画面（http://localhost:8002/admin）にアクセス
+2. 「📄 PDFからインポート」セクションでPDFファイルを選択
+3. 「📥 PDFから情報を抽出」ボタンをクリック
+4. 抽出されたデータを確認・必要に応じて編集
+5. 「✅ すべて登録」または個別に登録
+
+### セットアップ
+環境変数に以下を追加してください：
+
+```bash
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+```
+
 ## 📋 システム構成
 
 このシステムは以下のコンポーネントで構成されています：
@@ -37,12 +61,13 @@
 
 ### 1. 環境変数の設定
 
-`.env`ファイルを編集してPostgreSQLのパスワードを設定してください：
+`.env`ファイルを編集してPostgreSQLのパスワードとAnthropicのAPIキーを設定してください：
 
 ```bash
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=your_secure_password
 FLIGHT_DB=flight_db
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
 ```
 
 ### 2. Docker Composeで起動
@@ -74,6 +99,7 @@ docker-compose up -d
 | GET | `/api/flights/export` | データエクスポート |
 | POST | `/api/flights/import` | データインポート |
 | POST | `/api/flights/{id}/upload-eticket` | Eチケットアップロード |
+| **POST** | **`/api/flights/import-from-pdf`** | **PDFからフライト情報を抽出（新機能）** |
 | GET | `/admin` | 管理画面 |
 
 ### flight-node-server (ポート: 3005)
@@ -86,6 +112,24 @@ docker-compose up -d
 | POST | `/api/flights/import` | データインポート |
 
 ## 💻 管理画面の使い方
+
+### PDFからのインポート（新機能）
+
+1. http://localhost:8002/admin にアクセス
+2. 「📄 PDFからインポート」セクションでEチケットPDFを選択
+3. 「📥 PDFから情報を抽出」をクリック
+4. 抽出されたフライト情報がプレビューテーブルに表示されます
+5. 必要に応じて情報を編集
+6. 「✅ すべて登録」で一括登録、または個別に登録
+
+**対応する情報：**
+- 搭乗日付
+- フライト番号
+- 出発空港・到着空港（3レターコード）
+- 出発時刻・到着時刻
+- 予約番号
+- 座席番号
+- 支払額・通貨
 
 ### 新規フライト追加
 
@@ -161,6 +205,7 @@ FlightReservationSystem/
 
 - `.env`ファイルは`.gitignore`に含まれており、Gitにコミットされません
 - 本番環境では必ず強力なパスワードを使用してください
+- **Anthropic APIキーは機密情報です。絶対に公開しないでください**
 - EチケットPDFは`flight-api/pdfs/`ディレクトリに保存されます
 
 ## 📝 注意事項
@@ -170,6 +215,8 @@ FlightReservationSystem/
   - PostgreSQL: 55433 (StellaKanonWebの55432と重複しないように設定)
   - flight-api: 8002
   - flight-node-server: 3005
+- PDFインポート機能を使用するには、Anthropic API キーが必要です
+- Claude API（claude-haiku-4-5-20251001）を使用しています
 
 ## 🛠️ トラブルシューティング
 
@@ -188,6 +235,12 @@ docker-compose up -d
 
 - `.env`ファイルの設定を確認
 - PostgreSQLコンテナが起動しているか確認: `docker-compose ps`
+
+### PDFインポートが動作しない
+
+- `ANTHROPIC_API_KEY`が`.env`に正しく設定されているか確認
+- APIキーが有効か確認
+- コンテナを再起動: `docker-compose restart flight-api`
 
 ### ポート競合エラー
 

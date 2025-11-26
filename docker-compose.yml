@@ -21,6 +21,7 @@ services:
       - POSTGRES_HOST=postgres-db
       - POSTGRES_PORT=5432
       - FLIGHT_DB=${FLIGHT_DB}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
     depends_on:
       - postgres-db
     ports:

@@ -10,6 +10,8 @@ from decimal import Decimal
 import os
 import json
 import shutil
+import base64
+import anthropic
 
 from .database import get_db, init_db
 from .models import Flight
@@ -100,6 +102,12 @@ class ImportResponse(BaseModel):
     message: str
     deleted: int
     imported: int
+
+class PDFImportResponse(BaseModel):
+    """PDFインポートレスポンスモデル"""
+    success: bool
+    message: str
+    flights: List[dict]
 
 @app.on_event("startup")
 async def startup_db_client():
@@ -389,6 +397,139 @@ async def upload_eticket(
         "message": "Eチケットをアップロードしました",
         "file_path": file_path
     }
+
+@app.post("/api/flights/import-from-pdf", response_model=PDFImportResponse)
+async def import_from_pdf(file: UploadFile = File(...)):
+    """PDFからフライト情報を抽出（Claude API使用）"""
+    # ファイル形式チェック
+    if not file.filename.lower().endswith('.pdf'):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="PDFファイルのみアップロード可能です"
+        )
+    
+    try:
+        # PDFファイルを読み込んでBase64エンコード
+        pdf_content = await file.read()
+        pdf_base64 = base64.standard_b64encode(pdf_content).decode("utf-8")
+        
+        # APIキーを環境変数から取得
+        api_key = os.getenv("ANTHROPIC_API_KEY")
+        if not api_key:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="ANTHROPIC_API_KEYが設定されていません"
+            )
+        
+        # Claude APIクライアントを初期化
+        client = anthropic.Anthropic(api_key=api_key)
+        
+        # プロンプトを作成（日本語）
+        prompt = """このEチケットPDFから、以下の情報を抽出してください。
+1つのEチケットに複数の便が含まれている場合は、すべての便の情報を抽出してください。
+
+抽出する情報：
+- flight_date: 搭乗日付 (YYYY-MM-DD形式)
+- flight_number: フライト番号 (例: NH123)
+- departure_airport: 出発空港 (3レターコード、例: NRT)
+- arrival_airport: 到着空港 (3レターコード、例: HND)
+- departure_time: 出発時刻 (HH:MM形式、例: 09:30)
+- arrival_time: 到着時刻 (HH:MM形式、例: 11:00)
+- reservation_number: 予約番号
+- seat_number: 座席番号 (例: 12A)
+- payment_amount: 支払額 (数値のみ)
+- currency: 通貨 (例: JPY, USD)
+
+以下のJSON形式で返してください（他のテキストは一切含めず、JSONのみを返してください）：
+{
+  "flights": [
+    {
+      "flight_date": "2025-12-01",
+      "flight_number": "NH123",
+      "departure_airport": "NRT",
+      "arrival_airport": "HND",
+      "departure_time": "09:30",
+      "arrival_time": "11:00",
+      "reservation_number": "ABC123",
+      "seat_number": "12A",
+      "payment_amount": 25000,
+      "currency": "JPY",
+      "status": "Reserved"
+    }
+  ]
+}
+
+情報が見つからない場合はnullを設定してください。"""
+        
+        # Claude APIを呼び出し
+        message = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=4096,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "document",
+                            "source": {
+                                "type": "base64",
+                                "media_type": "application/pdf",
+                                "data": pdf_base64
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "text": prompt
+                        }
+                    ]
+                }
+            ]
+        )
+        
+        # レスポンスからテキストを抽出
+        response_text = message.content[0].text
+        
+        # JSONをパース
+        try:
+            # レスポンスからJSONを抽出（マークダウンのコードブロックを除去）
+            json_text = response_text.strip()
+            if json_text.startswith("```"):
+                # コードブロックを除去
+                lines = json_text.split("\n")
+                json_text = "\n".join(lines[1:-1]) if len(lines) > 2 else json_text
+            
+            flight_data = json.loads(json_text)
+            
+            if "flights" not in flight_data or not isinstance(flight_data["flights"], list):
+                raise ValueError("レスポンスに'flights'配列が含まれていません")
+            
+            return PDFImportResponse(
+                success=True,
+                message=f"{len(flight_data['flights'])}件のフライト情報を抽出しました",
+                flights=flight_data["flights"]
+            )
+            
+        except json.JSONDecodeError as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"JSONのパースに失敗しました: {str(e)}\nレスポンス: {response_text}"
+            )
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"レスポンスの形式が不正です: {str(e)}"
+            )
+            
+    except anthropic.APIError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Claude APIエラー: {str(e)}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"PDFの処理中にエラーが発生しました: {str(e)}"
+        )
 
 @app.get("/admin")
 async def admin_page():
