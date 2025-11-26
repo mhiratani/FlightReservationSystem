@@ -593,11 +593,11 @@ async def get_pdf(filename: str):
             detail="PDFファイルが見つかりません"
         )
     
-    # PDFファイルを返す
+    # PDFファイルを返す（ブラウザでインライン表示）
     return FileResponse(
         path=pdf_path,
         media_type="application/pdf",
-        filename=filename
+        headers={"Content-Disposition": f"inline; filename={filename}"}
     )
 
 @app.get("/api/flights/{flight_id}/eticket")
@@ -638,11 +638,11 @@ async def get_flight_eticket(flight_id: int, db: AsyncSession = Depends(get_db))
     # ファイル名を抽出
     filename = os.path.basename(db_flight.eticket_pdf_path)
     
-    # PDFファイルを返す
+    # PDFファイルを返す（ブラウザでインライン表示）
     return FileResponse(
         path=pdf_full_path,
         media_type="application/pdf",
-        filename=filename
+        headers={"Content-Disposition": f"inline; filename={filename}"}
     )
 
 @app.get("/admin")
