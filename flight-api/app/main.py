@@ -375,6 +375,20 @@ async def upload_eticket(
     # 予約番号を取得
     reservation_number = db_flight.reservation_number
     
+    # 同じ予約番号を持つすべてのフライトを取得
+    result = await db.execute(
+        select(Flight).where(Flight.reservation_number == reservation_number)
+    )
+    related_flights = result.scalars().all()
+    
+    # 古いPDFファイルのパスを取得（削除用）
+    old_pdf_path = None
+    if related_flights and related_flights[0].eticket_pdf_path:
+        old_pdf_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            related_flights[0].eticket_pdf_path
+        )
+    
     # ファイル名生成（予約番号ベース）
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     safe_filename = f"eticket_{reservation_number}_{timestamp}.pdf"
@@ -395,17 +409,20 @@ async def upload_eticket(
         )
     
     # 同じ予約番号を持つすべてのフライトを更新
-    result = await db.execute(
-        select(Flight).where(Flight.reservation_number == reservation_number)
-    )
-    related_flights = result.scalars().all()
-    
     updated_count = 0
     for flight in related_flights:
         flight.eticket_pdf_path = file_path
         updated_count += 1
     
     await db.commit()
+    
+    # 古いPDFファイルを削除
+    if old_pdf_path and os.path.exists(old_pdf_path):
+        try:
+            os.remove(old_pdf_path)
+        except Exception as e:
+            # ファイル削除に失敗しても続行（ログに記録するのみ）
+            print(f"警告: 古いPDFファイルの削除に失敗しました: {str(e)}")
     
     return {
         "success": True,
