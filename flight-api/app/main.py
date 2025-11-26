@@ -378,6 +378,9 @@ async def upload_eticket(
     file_path = os.path.join("pdfs", safe_filename)
     full_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), file_path)
     
+    # ディレクトリが存在しない場合は作成
+    os.makedirs(os.path.dirname(full_path), exist_ok=True)
+    
     # ファイルを保存
     try:
         with open(full_path, "wb") as buffer:
