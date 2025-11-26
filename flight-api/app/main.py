@@ -573,6 +573,78 @@ async def import_from_file(file: UploadFile = File(...)):
             detail=f"ファイルの処理中にエラーが発生しました: {str(e)}"
         )
 
+@app.get("/api/pdfs/{filename}")
+async def get_pdf(filename: str):
+    """PDFファイルを取得"""
+    # ファイル名のセキュリティチェック（パストラバーサル対策）
+    if ".." in filename or "/" in filename or "\\" in filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="無効なファイル名です"
+        )
+    
+    # PDFファイルのパスを構築
+    pdf_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "pdfs", filename)
+    
+    # ファイルの存在確認
+    if not os.path.exists(pdf_path):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="PDFファイルが見つかりません"
+        )
+    
+    # PDFファイルを返す
+    return FileResponse(
+        path=pdf_path,
+        media_type="application/pdf",
+        filename=filename
+    )
+
+@app.get("/api/flights/{flight_id}/eticket")
+async def get_flight_eticket(flight_id: int, db: AsyncSession = Depends(get_db)):
+    """フライトに紐づくEチケットPDFを取得"""
+    # フライトの存在確認
+    result = await db.execute(
+        select(Flight).where(Flight.id == flight_id)
+    )
+    db_flight = result.scalar_one_or_none()
+    
+    if db_flight is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="フライトが見つかりません"
+        )
+    
+    # PDFパスの確認
+    if not db_flight.eticket_pdf_path:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="このフライトにはEチケットが紐づいていません"
+        )
+    
+    # PDFファイルのフルパスを構築
+    pdf_full_path = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)),
+        db_flight.eticket_pdf_path
+    )
+    
+    # ファイルの存在確認
+    if not os.path.exists(pdf_full_path):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="PDFファイルが見つかりません"
+        )
+    
+    # ファイル名を抽出
+    filename = os.path.basename(db_flight.eticket_pdf_path)
+    
+    # PDFファイルを返す
+    return FileResponse(
+        path=pdf_full_path,
+        media_type="application/pdf",
+        filename=filename
+    )
+
 @app.get("/admin")
 async def admin_page():
     """管理画面を表示"""
