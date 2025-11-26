@@ -352,7 +352,7 @@ async def upload_eticket(
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db)
 ):
-    """EチケットPDFをアップロード"""
+    """EチケットPDFをアップロード（同じ予約番号のすべてのフライトに紐づける）"""
     # フライトの存在確認
     result = await db.execute(
         select(Flight).where(Flight.id == flight_id)
@@ -372,9 +372,12 @@ async def upload_eticket(
             detail="PDFファイルのみアップロード可能です"
         )
     
-    # ファイル名生成
+    # 予約番号を取得
+    reservation_number = db_flight.reservation_number
+    
+    # ファイル名生成（予約番号ベース）
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    safe_filename = f"eticket_{flight_id}_{timestamp}.pdf"
+    safe_filename = f"eticket_{reservation_number}_{timestamp}.pdf"
     file_path = os.path.join("pdfs", safe_filename)
     full_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), file_path)
     
@@ -391,14 +394,25 @@ async def upload_eticket(
             detail=f"ファイルの保存に失敗しました: {str(e)}"
         )
     
-    # データベースを更新
-    db_flight.eticket_pdf_path = file_path
+    # 同じ予約番号を持つすべてのフライトを更新
+    result = await db.execute(
+        select(Flight).where(Flight.reservation_number == reservation_number)
+    )
+    related_flights = result.scalars().all()
+    
+    updated_count = 0
+    for flight in related_flights:
+        flight.eticket_pdf_path = file_path
+        updated_count += 1
+    
     await db.commit()
     
     return {
         "success": True,
-        "message": "Eチケットをアップロードしました",
-        "file_path": file_path
+        "message": f"Eチケットをアップロードし、{updated_count}件のフライトに紐づけました",
+        "file_path": file_path,
+        "updated_flights": updated_count,
+        "reservation_number": reservation_number
     }
 
 @app.post("/api/flights/import-from-file", response_model=PDFImportResponse)
